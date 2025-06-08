@@ -55,39 +55,55 @@
   - 处理表情符号和 emoji
   - 统一繁简体转换
 - ✂️ **中文分词**
-  - 使用 gensim 等工具进行中文分词
-  - 去除停用词
-  - 保留情绪相关的关键词
+  - 使用 spaCy 或其他先进的分词工具
 
 ### 词向量训练 (Word Embedding)
 
 - 📚 **语料准备**
-  - 基于训练集构建词汇表
-  - 设置最小词频阈值
-- 🎯 **Word2Vec 训练**
-  - 使用 gensim 库训练 Word2Vec 模型
-  - 调优向量维度、窗口大小等超参数
-  - 验证词向量质量（相似词检验）
+  - 基于训练集和测试集（仅文本内容，不含标签）的清洗后文本进行分词。
+- 🎯 **词向量选择/训练**
+  - **当前方案: 使用 spaCy 模型生成句子向量**
+    - 利用已加载的 spaCy 中文模型 (如 `zh_core_web_sm`)。
+    - 对分词后的词语列表（token list），通过 spaCy 的 `Doc` 对象的 `.vector` 属性生成句子级别的向量表示。
+    - 这种方法利用模型内部的表示能力，不直接加载外部的预训练词向量文件，符合项目要求。
 
 ### 模型设计 (Model Architecture)
 
 - 🏗️ **基础模型选择**
-  - CNN 模型：捕获局部 n-gram 特征
-  - RNN/LSTM/GRU：处理序列依赖关系
-  - 混合模型：结合 CNN 和 RNN 优势
+  - **Transformer-based 模型**:
+    - BERT (Bidirectional Encoder Representations from Transformers)
+    - RoBERTa (A Robustly Optimized BERT Pretraining Approach)
+    - ERNIE (Enhanced Representation through kNowledge IntEgration)
+    - 其他针对中文优化的预训练模型 (如 MacBERT, Chinese-BERT-wwm)
+  - **轻量级 Transformer 模型**:
+    - ALBERT (A Lite BERT for Self-supervised Learning of Language Representations)
+    - DistilBERT (a distilled version of BERT)
 - ⚙️ **网络结构设计**
-  - 嵌入层：加载预训练词向量
-  - 特征提取层：CNN 卷积或 RNN 循环
-  - 分类层：全连接层 + Softmax
+  - **对于 Transformer-based 模型**:
+    - 输入层：使用模型对应的 Tokenizer 对文本进行编码（包括特殊标记如 [CLS], [SEP]）
+    - 嵌入层：加载预训练模型的权重
+    - Transformer 编码器层：利用预训练模型的强大特征提取能力
+    - 池化层 (Pooling)：通常使用 [CLS] token 的输出作为句子表示，或对所有 token 输出进行平均/最大池化
+    - 分类层：在池化输出后接一个或多个全连接层 (Dense Layer) + Softmax 进行分类
+  - **对于传统深度学习模型**:
+    - 嵌入层：加载预训练词向量或随机初始化
+    - 特征提取层：CNN 卷积层、RNN/LSTM/GRU 层
+    - 池化层 (可选)
+    - 分类层：全连接层 + Softmax
 - 🎛️ **超参数设置**
-  - 学习率、批次大小、dropout 率
-  - 隐藏层维度、卷积核大小
-  - 优化器选择（Adam、SGD 等）
+  - **通用超参数**:
+    - 学习率 (Learning Rate)：通常需要针对不同模型进行调整，预训练模型微调时常使用较小的学习率
+    - 批次大小 (Batch Size)
+    - Dropout 率
+    - 优化器选择 (AdamW, Adam, SGD 等)
+  - **Transformer 特定超参数**:
+    - 最大序列长度 (Max Sequence Length)
+    - 学习率调度器 (Learning Rate Scheduler, e.g., linear warmup with decay)
 
 ### 模型训练 (Model Training)
 
 - 🔄 **训练策略**
-  - 数据划分：训练集/验证集分割
+  - 数据划分：训练集/验证集分割 (通常 80/20 或 90/10)
   - 批次训练和梯度更新
   - 早停机制防止过拟合
 - 📈 **训练监控**
@@ -109,24 +125,3 @@
   - 超参数调优（网格搜索、贝叶斯优化）
   - 模型集成（投票、平均等）
   - 特征工程改进
-
-### 最终测试 (Final Testing)
-
-- 🏆 **测试集评估**
-  - 使用最佳模型在测试集上预测
-  - 计算最终的宏精确度、宏召回率、宏 F1 值
-  - 生成预测结果文件
-- 📊 **结果分析**
-  - 各情绪类别的详细性能分析
-  - 模型预测的置信度分析
-  - 失败案例的深入分析
-
-### 报告撰写 (Report Writing)
-
-- 📝 **实验报告内容**
-  - 数据预处理详细过程
-  - 词向量训练方法和参数
-  - 模型架构图和设计思路
-  - 超参数选择和调优过程
-  - 训练过程中各指标变化趋势
-  - 最终结果分析和改进建议

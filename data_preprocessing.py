@@ -2,6 +2,16 @@ import re
 import emoji
 from zhconv import convert
 import polars as pl
+import spacy
+
+# 加载spacy中文模型
+try:
+    nlp = spacy.load("zh_core_web_md")
+except OSError:
+    print(
+        "未找到'zh_core_web_md'模型。请运行 'python -m spacy download zh_core_web_md' 来下载它。"
+    )
+    nlp = None
 
 
 def clean_text(text: str) -> str:
@@ -26,8 +36,8 @@ def clean_text(text: str) -> str:
         text,
     )
 
-    # 去除@用户名
-    text = re.sub(r"@[^\s@]+", "", text)
+    # 去除@用户名以及类似 //@xxx: 的模式
+    text = re.sub(r"//@.*?:", "", text)
 
     # 处理emoji - 将emoji转换为文字描述然后移除
     text = emoji.demojize(text, language="zh")
@@ -60,3 +70,40 @@ def clear_df(df: pl.DataFrame) -> pl.DataFrame:
         .alias("cleaned_content")
     )
     return df_cleaned
+
+
+def tokenize_text(text: str) -> list[str]:
+    """
+    使用spacy对文本进行分词
+    """
+    if nlp is None or not isinstance(text, str):
+        return []
+    doc = nlp(text)
+    return [token.text for token in doc]
+
+
+def tokenize_df(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    将DataFrame中的cleaned_content列转换为分词结果，并添加为新列'token'
+    使用nlp.pipe()进行批量处理以提高效率。
+    """
+    if "cleaned_content" not in df.columns:
+        raise ValueError(
+            "DataFrame must contain a 'cleaned_content' column for tokenization."
+        )
+
+    if nlp is None:
+        raise RuntimeError("Spacy 'zh_core_web_sm' model not loaded. Cannot tokenize.")
+
+    texts_to_tokenize = df["cleaned_content"].to_list()
+
+    tokenized_texts = [
+        [token.text for token in doc] for doc in nlp.pipe(texts_to_tokenize)
+    ]
+
+    # 创建一个新的Polars Series包含分词结果
+    token_series = pl.Series("token", tokenized_texts, dtype=pl.List(pl.String))
+
+    df_tokenized = df.with_columns(token_series)
+
+    return df_tokenized
